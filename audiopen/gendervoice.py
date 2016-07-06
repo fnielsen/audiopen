@@ -13,6 +13,8 @@ from urlparse import urlsplit
 
 from pandas import DataFrame
 
+from pydub import AudioSegment
+
 import sparql
 
 
@@ -149,3 +151,47 @@ def download_all(metadata, directory=DATA_DIRECTORY):
     # Download audio files iteratively
     for remote_filename in metadata.audio:
         download_one(remote_filename, directory=directory)
+
+
+def filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False): 
+    """Yield filenames for audio files.
+
+    Parameters
+    ----------
+    directory : str
+        Local directory where the audio files are to be stored.
+
+    Yields
+    ------
+    filename : str
+        Local filename for audio file
+
+    """
+    for index, row in metadata.iterrows():
+        remote_filename = field_to_value(row.audio)
+        filename = link_to_filename(remote_filename)
+        local_filename = join(directory, filename)
+        if yieldgender:
+            yield local_filename, row.gender
+        else:
+            yield local_filename
+
+
+def audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
+    """Yield audio segments objects.
+
+    Yields
+    ------
+    audio_segment : pydub.AudioSegment
+        Audio segments.
+
+    """
+    for filename, gender in filenames(
+            metadata, directory=directory, yieldgender=True):
+        audio_segment = AudioSegment.from_file(filename)
+        if yieldgender:
+            yield audio_segment, gender
+        else: 
+            yield audio_segment
+
+
