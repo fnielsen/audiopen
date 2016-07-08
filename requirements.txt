@@ -1,0 +1,3 @@
+pandas
+pydub
+sparql-client
