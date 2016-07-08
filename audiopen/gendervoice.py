@@ -23,6 +23,7 @@ DATA_DIRECTORY = join(expanduser('~'), 'data', 'audiopen')
 QUERY_METADATA = """
 PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
 
 select ?person ?personLabel ?audio ?gender ?genderLabel where {
   ?person wdt:P990 ?audio .
