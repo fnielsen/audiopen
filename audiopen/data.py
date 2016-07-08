@@ -24,8 +24,6 @@ from urllib2 import urlopen
 
 import numpy as np
 
-import audiotools
-
 from pydub import AudioSegment
 
 
@@ -100,34 +98,6 @@ def filenames(directory=DATA_DIRECTORY, yieldcategory=False):
             yield local_filename, row.Category
         else:
             yield local_filename
-
-
-def audio_files(directory=DATA_DIRECTORY):
-    """Yield audiofile objects.
-
-    Yields
-    ------
-    audiofile : audiotools.AudioFile
-        Audiofile object.
-
-    """
-    for filename, category in filenames(directory=directory):
-        audiofile = audiotools.open(filename)
-        yield audiofile
-    
-
-def pcm_readers(directory=DATA_DIRECTORY):
-    """Yield PCM objects.
-
-    Yields
-    ------
-    pcm : audiotools.PCMReader
-        PCM object.
-
-    """
-    for audio_file in audio_files(directory=directory):
-        pcm = audio_file.to_pcm()
-        yield pcm
 
 
 def audio_segments(directory=DATA_DIRECTORY, yieldcategory=False):
