@@ -44,7 +44,8 @@ def query_metadata():
         Dataframe
 
     """
-    service = sparql.Service('https://query.wikidata.org/sparql')
+    service = sparql.Service('https://query.wikidata.org/sparql',
+                             method='GET')
     response = service.query(QUERY_METADATA)
     df = DataFrame(response.fetchall(), columns=response.variables)
     return df
