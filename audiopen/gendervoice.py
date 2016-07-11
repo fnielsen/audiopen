@@ -1,9 +1,18 @@
-"""Gendervoice."""
+"""Gendervoice.
+
+Examples
+--------
+>>> import audiopen.gendervoice
+>>> metadata = audiopen.gendervoice.query_metadata()
+
+"""
 
 import errno
 
+from hashlib import sha256
+
 from os import makedirs
-from os.path import exists, expanduser, join
+from os.path import exists, expanduser, join, splitext
 
 from string import split
 
@@ -43,6 +52,10 @@ def query_metadata():
     df : pandas.DataFrame
         Dataframe
 
+    Examples
+    --------
+    >>> metadata = query_metadata()
+
     """
     service = sparql.Service('https://query.wikidata.org/sparql',
                              method='GET')
@@ -81,7 +94,7 @@ def link_to_filename(link):
 
     Returns
     -------
-    filename : str
+    sha256_filename : str
         Filename part of the link
 
     Examples
@@ -89,11 +102,16 @@ def link_to_filename(link):
     >>> link = "http://commons.wikimedia.org/wiki/" \
     ...     "Special:FilePath/Sound.flac"
     >>> link_to_filename(link)
-    'Sound.flac'
+    'd5a0d1446b54242cd465ee0a9978e43b25ce7809c2d9d6a534fd3c7e665bac0c.flac'
 
     """
     link = field_to_value(link)   # possible conversion for sparql.IRI
-    filename = split(urlsplit(link).path, '/')[-1]
+    commons_filename = split(urlsplit(link).path, '/')[-1]
+    sha256_filename = sha256(commons_filename).hexdigest()
+    _, extension = splitext(link)
+    if extension.lower() not in ['.flac', '.oga', '.ogg', '.wav']:
+        raise Exception('Unrecognized extension: {}'.format(extension))
+    filename = sha256_filename + extension
     return filename
 
 
@@ -155,7 +173,7 @@ def download_all(metadata, directory=DATA_DIRECTORY):
         download_one(remote_filename, directory=directory)
 
 
-def filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False): 
+def filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False):
     """Yield filenames for audio files.
 
     Parameters
@@ -193,7 +211,5 @@ def audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
         audio_segment = AudioSegment.from_file(filename)
         if yieldgender:
             yield audio_segment, gender
-        else: 
+        else:
             yield audio_segment
-
-
