@@ -1,3 +1,4 @@
+aubio
 pandas
 pydub
 sparql-client
