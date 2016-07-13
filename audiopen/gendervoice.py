@@ -7,7 +7,7 @@ http://www.wikidata.org/entity/Q6581097 is man
 Examples
 --------
 >>> import audiopen.gendervoice
->>> metadata = audiopen.gendervoice.query_metadata()
+>>> metadata = audiopen.gendervoice.load_metadata()
 
 """
 
@@ -24,11 +24,13 @@ from urllib2 import urlopen
 
 from urlparse import urlsplit
 
+import wave
+
 import aubio
 
 import numpy as np
 
-from pandas import DataFrame
+from pandas import DataFrame, read_csv
 
 from pydub import AudioSegment
 
@@ -36,6 +38,8 @@ import sparql
 
 
 DATA_DIRECTORY = join(expanduser('~'), 'data', 'audiopen')
+
+METADATA_FILENAME = 'gendervoice.csv'
 
 QUERY_METADATA = """
 PREFIX wd: <http://www.wikidata.org/entity/>
@@ -73,6 +77,45 @@ def query_metadata():
     response = service.query(QUERY_METADATA)
     df = DataFrame(response.fetchall(), columns=response.variables)
     return df
+
+
+def save_metadata(metadata, directory=DATA_DIRECTORY):
+    """Save metadata to local file.
+
+    Parameters
+    ----------
+    metadata : pandas.DataFrame
+        Dataframe with metadata
+
+    Examples
+    --------
+    >>> metadata = query_metadata()
+    >>> save_metadata(metadata)
+    >>> metadata = load_metadata()
+
+    """
+    # Make directory if not exist
+    try:
+        makedirs(directory)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
+    filename = join(directory, METADATA_FILENAME)
+    metadata.to_csv(filename, encoding='utf-8')
+
+
+def load_metadata(directory=DATA_DIRECTORY):
+    """Load metadata from local file.
+
+    Returns
+    -------
+    metadata : pandas.DataFrame
+        Dataframe with metadata.
+
+    """
+    filename = join(directory, METADATA_FILENAME)
+    metadata = read_csv(filename)
+    return metadata
 
 
 def field_to_value(field):
@@ -197,7 +240,7 @@ def download_all(metadata, directory=DATA_DIRECTORY):
         download_one(remote_filename, directory=directory)
 
 
-def filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False):
+def iter_filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False):
     """Yield filenames for audio files.
 
     Parameters
@@ -228,7 +271,7 @@ def filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False):
             yield local_filename
 
 
-def audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
+def iter_audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
     """Yield audio segments objects.
 
     Parameters
@@ -244,18 +287,25 @@ def audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
     ------
     audio_segment : pydub.AudioSegment
         Audio segments.
+    gender : str
+        Gender represented as URI
 
     """
-    for filename, gender in filenames(
+    for filename, gender in iter_filenames(
             metadata, directory=directory, yieldgender=True):
-        audio_segment = AudioSegment.from_file(filename)
+        try:
+            audio_segment = AudioSegment.from_file(filename)
+        except wave.Error:
+            # The 'wave' module cannot read certain wave files.
+            # Here these files are ignored.
+            continue
         if yieldgender:
             yield audio_segment, gender
         else:
             yield audio_segment
 
 
-def audio_segments_mono_11025(
+def iter_audio_segments_mono_11025(
         metadata, directory=DATA_DIRECTORY, yieldgender=False):
     """Yield audio segments in mono and 11025 Hz.
 
@@ -279,7 +329,7 @@ def audio_segments_mono_11025(
 
     Examples
     --------
-    >>> metadata = query_metadata()
+    >>> metadata = load_metadata()
     >>> audio_segments = audio_segments_mono_11025(metadata)
     >>> audio_segment = audio_segments.next()
     >>> audio_segment.channels
@@ -287,14 +337,15 @@ def audio_segments_mono_11025(
     >>> audio_segment.frame_rate
     11025
 
-    >>> audio_segments = audio_segments_mono_11025(metadata, yieldgender=True)
+    >>> audio_segments = iter_audio_segments_mono_11025(
+    ...     metadata, yieldgender=True)
     >>> audio_segment, gender = audio_segments.next()
     >>> gender in ['https://www.wikidata.org/wiki/Q6581097',
     ...     'https://www.wikidata.org/wiki/Q6581072']
     True
 
     """
-    for audio_segment, gender in audio_segments(
+    for audio_segment, gender in iter_audio_segments(
             metadata, directory=directory, yieldgender=True):
         output = audio_segment.split_to_mono()[0].set_frame_rate(11025)
         if yieldgender:
@@ -303,7 +354,7 @@ def audio_segments_mono_11025(
             yield output
 
 
-def samples_mono_11025(
+def iter_samples_mono_11025(
         metadata, directory=DATA_DIRECTORY, yieldgender=False):
     """Yield audio segments in mono and 11025 Hz.
 
@@ -323,17 +374,16 @@ def samples_mono_11025(
     samples : numpy.array
         Resampled audio segments in mono as numpy array
     gender : str
-        Gender of sample represented as a string. It is only yielded if
-        yieldgender is True
+        Gender represented as URI
 
     Examples
     --------
-    >>> metadata = query_metadata()
-    >>> samples = samples_mono_11025(metadata, yieldgender=True)
+    >>> metadata = load_metadata()
+    >>> samples = iter_samples_mono_11025(metadata, yieldgender=True)
     >>> sample, gender = samples.next()
 
     """
-    for audio_segment, category in audio_segments_mono_11025(
+    for audio_segment, category in iter_audio_segments_mono_11025(
             metadata, directory=directory, yieldgender=True):
         output = np.array(audio_segment.get_array_of_samples())
         if yieldgender:
@@ -342,8 +392,22 @@ def samples_mono_11025(
             yield output
 
 
-def chunk(samples, chunksize=1024):
-    """Yield chunks."""
+def iter_chunk(samples, chunksize=1024):
+    """Yield chunks.
+
+    Parameters
+    ----------
+    samples : array_like
+        List of samples in numpy array.
+    chunksize : int
+        Number of samples in each yielded chunk.
+
+    Yields
+    ------
+    sample_chunk : array_like
+        List of samples in numpy array.
+
+    """
     n_chunks = (samples.shape[0] // chunksize) + 1
     for n in iter(range(n_chunks)):
         offset = n * chunksize
@@ -352,11 +416,11 @@ def chunk(samples, chunksize=1024):
         yield sample_chunk
 
 
-def samples_to_pitches(
+def iter_samples_to_pitches(
         samples, method='yin', bufsize=2048, hopsize=256, samplerate=11025):
     """Yield pitches."""
     pitcher = aubio.pitch(method, bufsize, hopsize, samplerate)
-    for sample_chunk in chunk(samples):
+    for sample_chunk in iter_chunk(samples):
         pitch = pitcher(sample_chunk.astype(np.float32))[0]
         confidence = pitcher.get_confidence()
         yield pitch
