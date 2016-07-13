@@ -1,9 +1,5 @@
 """Gendervoice.
 
-Binary gender is represented with Wikidata URI: 
-
-http://www.wikidata.org/entity/Q6581097 is man
-
 Examples
 --------
 >>> import audiopen.gendervoice
@@ -46,10 +42,12 @@ PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
 PREFIX wikibase: <http://wikiba.se/ontology#>
 
-SELECT ?person ?personLabel ?audio ?gender ?genderLabel WHERE {
+SELECT ?person ?personLabel ?audio ?gender ?genderLabel ?birthyear WHERE {
   ?person wdt:P990 ?audio .
   ?person wdt:P21 ?gender .
   FILTER (?gender IN (wd:Q6581072, wd:Q6581097))  # Avoid transgender
+  OPTIONAL { ?person wdt:P569 ?birthdate .
+    BIND(year(?birthdate) AS ?birthyear) }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en,da" }
 }
 """
@@ -60,12 +58,13 @@ def query_metadata():
 
     This function will use the query.wikidata.org SPARQL service to query for
     items with a specified gender and which are associated with a voice audio
-    file through the P990 property.
+    file through the P990 property. Properties from Wikidata will be returned
+    in columns of a Pandas dataframe.
 
     Returns
     -------
-    df : pandas.DataFrame
-        Dataframe
+    metadata : pandas.DataFrame
+        Dataframe with metadata.
 
     Examples
     --------
@@ -86,6 +85,8 @@ def save_metadata(metadata, directory=DATA_DIRECTORY):
     ----------
     metadata : pandas.DataFrame
         Dataframe with metadata
+    directory : str
+        Local directory where the audio files are to be stored.
 
     Examples
     --------
@@ -107,6 +108,14 @@ def save_metadata(metadata, directory=DATA_DIRECTORY):
 def load_metadata(directory=DATA_DIRECTORY):
     """Load metadata from local file.
 
+    If the file does not exist then it is downloaded via the `query_metadata`
+    function and saved for future load.
+
+    Parameters
+    ----------
+    directory : str
+        Local directory where the audio files are to be stored.
+
     Returns
     -------
     metadata : pandas.DataFrame
@@ -114,7 +123,12 @@ def load_metadata(directory=DATA_DIRECTORY):
 
     """
     filename = join(directory, METADATA_FILENAME)
-    metadata = read_csv(filename)
+    try:
+        metadata = read_csv(filename)
+    except IOError:
+        # File does not exist
+        metadata = query_metadata()
+        save_metadata(metadata, directory=directory)
     return metadata
 
 
@@ -257,18 +271,30 @@ def iter_filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False):
     filename : str
         Local filename for audio file
     gender : str
-        Gender represented as URI
+        Gender represented as string either 'male' or 'female'
 
     """
     for index, row in metadata.iterrows():
         remote_filename = field_to_value(row.audio)
         filename = link_to_filename(remote_filename)
         local_filename = join(directory, filename)
-        gender = field_to_value(row.gender)
+        gender = field_to_value(row.genderLabel)
         if yieldgender:
             yield local_filename, gender
         else:
             yield local_filename
+
+
+def get_filenames(metadata, directory=DATA_DIRECTORY):
+    """Return list of filenames.
+
+    Returns
+    -------
+    filenames : list of str
+        List of filenames with full path.
+
+    """
+    return list(iter_filenames(metadata, directory=directory))
 
 
 def iter_audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
@@ -303,6 +329,24 @@ def iter_audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
             yield audio_segment, gender
         else:
             yield audio_segment
+
+
+def get_audio_segment(filename, directory=DATA_DIRECTORY):
+    """Return audio segment.
+
+    Parameters
+    ----------
+    filename : str
+        Full path filename to audio file.
+
+    Returns
+    -------
+    audio_segment : AudioSegment
+        Object with audio data.
+
+    """
+    audio_segment = AudioSegment.from_file(filename)
+    return audio_segment
 
 
 def iter_audio_segments_mono_11025(
@@ -340,8 +384,7 @@ def iter_audio_segments_mono_11025(
     >>> audio_segments = iter_audio_segments_mono_11025(
     ...     metadata, yieldgender=True)
     >>> audio_segment, gender = audio_segments.next()
-    >>> gender in ['https://www.wikidata.org/wiki/Q6581097',
-    ...     'https://www.wikidata.org/wiki/Q6581072']
+    >>> gender in ['male', 'female']
     True
 
     """
@@ -354,9 +397,39 @@ def iter_audio_segments_mono_11025(
             yield output
 
 
+def get_audio_segment_mono_11025(audio, directory=DATA_DIRECTORY):
+    """Convert audio segment to mono and 11025 Hertz sample rate.
+
+    Parameters
+    ----------
+    audio : str or pydub.AudioSegment
+        Audio segment and AudioSegment or filename
+    directory : str
+        Local directory where the audio files are to be stored.
+
+    Returns
+    -------
+    audio_segment : pydub.AudioSegment
+        Audio segment
+
+    """
+    if type(audio) == str:
+        filename = audio
+        audio_segment = get_audio_segment(filename, directory=directory)
+    elif type(audio) == AudioSegment:
+        audio_segment = audio
+    else:
+        raise ValueError('audio input has the wrong type')
+    if audio_segment.channels == 1 and audio_segment.frame_rate == 11025:
+        output = audio_segment
+    else:
+        output = audio_segment.split_to_mono()[0].set_frame_rate(11025)
+    return output
+
+
 def iter_samples_mono_11025(
         metadata, directory=DATA_DIRECTORY, yieldgender=False):
-    """Yield audio segments in mono and 11025 Hz.
+    """Yield samples in mono and 11025 Hz.
 
     The first channel is returned after a split to mono.
 
@@ -374,7 +447,7 @@ def iter_samples_mono_11025(
     samples : numpy.array
         Resampled audio segments in mono as numpy array
     gender : str
-        Gender represented as URI
+        Gender represented as string
 
     Examples
     --------
@@ -390,6 +463,32 @@ def iter_samples_mono_11025(
             yield output, category
         else:
             yield output
+
+
+def get_samples_mono_11025(
+        audio, directory=DATA_DIRECTORY, yieldgender=False):
+    """Return samples in mono and 11025 Hz.
+
+    The first channel is returned after a split to mono.
+
+    Parameters
+    ----------
+    audio : str or pydub.AudioSegment
+        Filename of audio object
+    directory : str
+        Local directory where the audio files are to be stored.
+    yieldgender : bool
+        Also yield gender if True.
+
+    Returnes
+    --------
+    samples : numpy.array
+        Resampled audio segments in mono as numpy array
+
+    """
+    audio_segment = get_audio_segment_mono_11025(audio)
+    output = np.array(audio_segment.get_array_of_samples())
+    return output
 
 
 def iter_chunk(samples, chunksize=1024):
@@ -408,7 +507,7 @@ def iter_chunk(samples, chunksize=1024):
         List of samples in numpy array.
 
     """
-    n_chunks = (samples.shape[0] // chunksize) + 1
+    n_chunks = ((samples.shape[0] - 1) // chunksize) + 1
     for n in iter(range(n_chunks)):
         offset = n * chunksize
         end = min(samples.shape[0], offset + chunksize)
@@ -424,3 +523,36 @@ def iter_samples_to_pitches(
         pitch = pitcher(sample_chunk.astype(np.float32))[0]
         confidence = pitcher.get_confidence()
         yield pitch
+
+
+def get_pitches(audio, method='yin', bufsize=2048, hopsize=256,
+                samplerate=11025):
+    """Get pitches for audio.
+
+    Parameters
+    ----------
+    audio : numpy.array or pydub.AudioSegment or string
+        Audio data.
+
+    Returns
+    -------
+    pitches : numpy.array
+        Array with pitch information.
+
+    """
+    if type(audio) == np.ndarray:
+        samples = audio
+    elif type(audio) == AudioSegment or type(audio) == str:
+        samples = get_samples_mono_11025(audio)
+    else:
+        raise ValueError('audio input has the wrong type')
+
+    pitcher = aubio.pitch(method, bufsize, hopsize, samplerate)
+
+    # Iterate over chunks in the sample
+    pitches = []
+    for sample_chunk in iter_chunk(samples):
+        pitch = pitcher(sample_chunk.astype(np.float32))[0]
+        confidence = pitcher.get_confidence()
+        pitches.append((pitch, confidence))
+    return np.array(pitches)
