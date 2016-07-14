@@ -254,7 +254,7 @@ def download_all(metadata, directory=DATA_DIRECTORY):
         download_one(remote_filename, directory=directory)
 
 
-def iter_filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False):
+def iter_filenames(metadata, directory=DATA_DIRECTORY, yield_gender=False):
     """Yield filenames for audio files.
 
     Parameters
@@ -263,7 +263,7 @@ def iter_filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False):
         Dataframe with metadata.
     directory : str
         Local directory where the audio files are to be stored.
-    yieldgender : bool
+    yield_gender : bool
         Also yield gender if True.
 
     Yields
@@ -279,7 +279,7 @@ def iter_filenames(metadata, directory=DATA_DIRECTORY, yieldgender=False):
         filename = link_to_filename(remote_filename)
         local_filename = join(directory, filename)
         gender = field_to_value(row.genderLabel)
-        if yieldgender:
+        if yield_gender:
             yield local_filename, gender
         else:
             yield local_filename
@@ -297,7 +297,8 @@ def get_filenames(metadata, directory=DATA_DIRECTORY):
     return list(iter_filenames(metadata, directory=directory))
 
 
-def iter_audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
+def iter_audio_segments(metadata, directory=DATA_DIRECTORY,
+                        yield_gender=False):
     """Yield audio segments objects.
 
     Parameters
@@ -306,7 +307,7 @@ def iter_audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
         Dataframe with metadata
     directory : str
         Local directory where the audio files are to be stored.
-    yieldgender : bool
+    yield_gender : bool
         Also yield gender if True.
 
     Yields
@@ -318,14 +319,14 @@ def iter_audio_segments(metadata, directory=DATA_DIRECTORY, yieldgender=False):
 
     """
     for filename, gender in iter_filenames(
-            metadata, directory=directory, yieldgender=True):
+            metadata, directory=directory, yield_gender=True):
         try:
             audio_segment = AudioSegment.from_file(filename)
         except wave.Error:
             # The 'wave' module cannot read certain wave files.
             # Here these files are ignored.
             continue
-        if yieldgender:
+        if yield_gender:
             yield audio_segment, gender
         else:
             yield audio_segment
@@ -350,7 +351,7 @@ def get_audio_segment(filename, directory=DATA_DIRECTORY):
 
 
 def iter_audio_segments_mono_11025(
-        metadata, directory=DATA_DIRECTORY, yieldgender=False):
+        metadata, directory=DATA_DIRECTORY, yield_gender=False):
     """Yield audio segments in mono and 11025 Hz.
 
     The first channel is returned after a split to mono.
@@ -361,7 +362,7 @@ def iter_audio_segments_mono_11025(
         Dataframe with metadata
     directory : str
         Local directory where the audio files are to be stored.
-    yieldgender : bool
+    yield_gender : bool
         Also yield gender if True.
 
     Yields
@@ -382,16 +383,16 @@ def iter_audio_segments_mono_11025(
     11025
 
     >>> audio_segments = iter_audio_segments_mono_11025(
-    ...     metadata, yieldgender=True)
+    ...     metadata, yield_gender=True)
     >>> audio_segment, gender = audio_segments.next()
     >>> gender in ['male', 'female']
     True
 
     """
     for audio_segment, gender in iter_audio_segments(
-            metadata, directory=directory, yieldgender=True):
+            metadata, directory=directory, yield_gender=True):
         output = audio_segment.split_to_mono()[0].set_frame_rate(11025)
-        if yieldgender:
+        if yield_gender:
             yield output, gender
         else:
             yield output
@@ -428,7 +429,7 @@ def get_audio_segment_mono_11025(audio, directory=DATA_DIRECTORY):
 
 
 def iter_samples_mono_11025(
-        metadata, directory=DATA_DIRECTORY, yieldgender=False):
+        metadata, directory=DATA_DIRECTORY, yield_gender=False):
     """Yield samples in mono and 11025 Hz.
 
     The first channel is returned after a split to mono.
@@ -439,7 +440,7 @@ def iter_samples_mono_11025(
         Dataframe with metadata
     directory : str
         Local directory where the audio files are to be stored.
-    yieldgender : bool
+    yield_gender : bool
         Also yield gender if True.
 
     Yields
@@ -452,21 +453,21 @@ def iter_samples_mono_11025(
     Examples
     --------
     >>> metadata = load_metadata()
-    >>> samples = iter_samples_mono_11025(metadata, yieldgender=True)
+    >>> samples = iter_samples_mono_11025(metadata, yield_gender=True)
     >>> sample, gender = samples.next()
 
     """
     for audio_segment, category in iter_audio_segments_mono_11025(
-            metadata, directory=directory, yieldgender=True):
+            metadata, directory=directory, yield_gender=True):
         output = np.array(audio_segment.get_array_of_samples())
-        if yieldgender:
+        if yield_gender:
             yield output, category
         else:
             yield output
 
 
 def get_samples_mono_11025(
-        audio, directory=DATA_DIRECTORY, yieldgender=False):
+        audio, directory=DATA_DIRECTORY, yield_gender=False):
     """Return samples in mono and 11025 Hz.
 
     The first channel is returned after a split to mono.
@@ -477,7 +478,7 @@ def get_samples_mono_11025(
         Filename of audio object
     directory : str
         Local directory where the audio files are to be stored.
-    yieldgender : bool
+    yield_gender : bool
         Also yield gender if True.
 
     Returnes
@@ -491,14 +492,16 @@ def get_samples_mono_11025(
     return output
 
 
-def iter_chunk(samples, chunksize=1024):
+def iter_chunk(samples, chunk_size=1024):
     """Yield chunks.
+
+    Generator yield Numpy array chunks from a longer Numpy array.
 
     Parameters
     ----------
     samples : array_like
         List of samples in numpy array.
-    chunksize : int
+    chunk_size : int
         Number of samples in each yielded chunk.
 
     Yields
@@ -507,27 +510,48 @@ def iter_chunk(samples, chunksize=1024):
         List of samples in numpy array.
 
     """
-    n_chunks = ((samples.shape[0] - 1) // chunksize) + 1
+    n_chunks = ((samples.shape[0] - 1) // chunk_size) + 1
     for n in iter(range(n_chunks)):
-        offset = n * chunksize
-        end = min(samples.shape[0], offset + chunksize)
+        offset = n * chunk_size
+        end = min(samples.shape[0], offset + chunk_size)
         sample_chunk = samples[offset:end]
         yield sample_chunk
 
 
 def iter_samples_to_pitches(
-        samples, method='yin', bufsize=2048, hopsize=256, samplerate=11025):
-    """Yield pitches."""
-    pitcher = aubio.pitch(method, bufsize, hopsize, samplerate)
+        samples, sample_rate=11025, method='yin', buf_size=2048, hop_size=256,
+        yield_confidence=False):
+    """Yield pitches.
+
+    Parameters
+    ----------
+    samples : numpy.ndarray
+        Samples in Numpy array.
+
+    Yields
+    ------
+    pitch : float
+        Pitch in Hertz
+    confidence : float
+        Confidence of the pitch detection.
+
+    """
+    pitcher = aubio.pitch(method, buf_size, hop_size, int(sample_rate))
     for sample_chunk in iter_chunk(samples):
         pitch = pitcher(sample_chunk.astype(np.float32))[0]
-        confidence = pitcher.get_confidence()
-        yield pitch
+        if yield_confidence:
+            confidence = pitcher.get_confidence()
+            yield pitch, confidence
+        else:
+            yield pitch
 
 
-def get_pitches(audio, method='yin', bufsize=2048, hopsize=256,
-                samplerate=11025):
-    """Get pitches for audio.
+def get_pitches(audio, sample_rate=11025, method='yin', buf_size=2048,
+                hop_size=256):
+    """Return estimated pitches for audio.
+
+    The 'yin' method from the `aubio` module is used for the pitch detection.
+    Multiple values are returned, one for each chunk.
 
     Parameters
     ----------
@@ -537,17 +561,18 @@ def get_pitches(audio, method='yin', bufsize=2048, hopsize=256,
     Returns
     -------
     pitches : numpy.array
-        Array with pitch information.
+        Array with pitch and confidence information.
 
     """
     if type(audio) == np.ndarray:
         samples = audio
     elif type(audio) == AudioSegment or type(audio) == str:
         samples = get_samples_mono_11025(audio)
+        sample_rate = 11025
     else:
         raise ValueError('audio input has the wrong type')
 
-    pitcher = aubio.pitch(method, bufsize, hopsize, samplerate)
+    pitcher = aubio.pitch(method, buf_size, hop_size, int(sample_rate))
 
     # Iterate over chunks in the sample
     pitches = []
@@ -556,3 +581,69 @@ def get_pitches(audio, method='yin', bufsize=2048, hopsize=256,
         confidence = pitcher.get_confidence()
         pitches.append((pitch, confidence))
     return np.array(pitches)
+
+
+def get_pitch(audio, sample_rate=11025, method='yin', buf_size=2048,
+              hop_size=256):
+    """Return estimated pitch for audio.
+
+    Parameters
+    ----------
+    audio : samples or audio segment or filename.
+        Audio data.
+    sample_rate : float or int
+        Sample rate in Hertz. Should be specified to the correct value for
+        samples input, otherwise inferred from the audio segment or file.
+
+    Returns
+    -------
+    pitch : float
+        Single value for pitch.
+
+    """
+    if type(audio) == np.ndarray:
+        pitches = get_pitches(
+            audio, sample_rate=sample_rate, method=method, buf_size=buf_size,
+            hop_size=hop_size)
+    else:
+        pitches = get_pitches(
+            audio, method=method, buf_size=buf_size, hop_size=hop_size)
+
+    # Top confidences
+    indices = np.argsort(-pitches[:, 1])[:min(10, pitches.shape[0])]
+
+    pitch = np.median(pitches[indices, 0])
+
+    return pitch
+
+
+def detect_gender(audio, sample_rate=11025):
+    """Detect gender of audio.
+
+    The present detection method is based on pitch detection and a threshold.
+
+    Parameters
+    ----------
+    audio : samples or audio segment or filename.
+        Audio data.
+    sample_rate : float or int
+        Sample rate in Hertz. Should be specified to the correct value with the
+        audio input is samples. Otherwise it is inferred from the audio segment
+        or file.
+
+    Returns
+    -------
+    gender : str
+        String representing gender as 'male' or 'female'.
+
+    """
+    if type(audio) == np.ndarray:
+        pitch = get_pitch(audio, sample_rate=sample_rate, method='yin',
+                          buf_size=2048, hop_size=256)
+    else:
+        pitch = get_pitch(audio, method='yin', buf_size=2048, hop_size=256)
+
+    if pitch > 145:
+        return 'female'
+    else:
+        return 'male'
