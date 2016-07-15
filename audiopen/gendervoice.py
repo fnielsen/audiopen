@@ -30,6 +30,8 @@ from pandas import DataFrame, read_csv
 
 from pydub import AudioSegment
 
+from pysoundcard import Stream
+
 import sparql
 
 
@@ -617,7 +619,8 @@ def get_pitch(audio, sample_rate=11025, method='yin', buf_size=2048,
     return pitch
 
 
-def detect_gender(audio, sample_rate=11025):
+def detect_gender(audio, sample_rate=11025, method='yin', buf_size=2048,
+                  hop_size=256): 
     """Detect gender of audio.
 
     The present detection method is based on pitch detection and a threshold.
@@ -638,12 +641,51 @@ def detect_gender(audio, sample_rate=11025):
 
     """
     if type(audio) == np.ndarray:
-        pitch = get_pitch(audio, sample_rate=sample_rate, method='yin',
-                          buf_size=2048, hop_size=256)
+        pitch = get_pitch(audio, sample_rate=sample_rate, method=method,
+                          buf_size=buf_size, hop_size=hop_size)
     else:
-        pitch = get_pitch(audio, method='yin', buf_size=2048, hop_size=256)
+        pitch = get_pitch(audio, method=method, buf_size=buf_size,
+                          hop_size=hop_size)
 
     if pitch > 145:
         return 'female'
     else:
         return 'male'
+
+
+def iter_capture_and_detect_gender(sample_rate = 11025, hop_size=256,
+                                   confidence_threshold=0.8):
+    """Capture audio and yield gender.
+
+    Parameters
+    ----------
+    sample_rate : int
+        Sample rate in Hertz
+    confidence_threshold : float
+        Pitch confidence threshold for yielding
+
+    Yields
+    ------
+    gender : str
+        String representing gender either 'male' or 'female'
+
+    """
+    stream = Stream(blocksize=hop_size, channels=1, samplerate=sample_rate)
+    stream.start()
+    try:
+        while True:
+            samples = stream.read(hop_size).flatten()
+            pitch_and_confidence = get_pitches(
+                samples, buf_size=hop_size, hop_size=hop_size,
+                sample_rate=sample_rate)
+            pitch = pitch_and_confidence[0, 0]
+            confidence = pitch_and_confidence[0, 1]
+            if pitch > 145:
+                gender = 'female'
+            else:
+                gender = 'male'
+            if confidence >= confidence_threshold:
+                yield gender
+    except KeyboardInterrupt:
+        pass
+    stream.stop()
