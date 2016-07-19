@@ -36,6 +36,8 @@ for filename, name, gender in zip(
         continue
     print(filename)
     pitches_for_person = audiopen.gendervoice.get_pitches(samples)
+    print("{:7} - {:.2f} Hz - {}".format(
+        gender, np.median(pitches_for_person[:, 0]), name))
     pitches_for_all.append((pitches_for_person, gender, name, filename))
 
 
