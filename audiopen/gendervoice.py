@@ -657,7 +657,11 @@ def get_pitches(audio, sample_rate=11025, method='yin', buf_size=2048,
 
     # Iterate over chunks in the sample
     pitches = []
-    for sample_chunk in iter_chunk(samples):
+    for sample_chunk in iter_chunk(samples, chunk_size=hop_size):
+        if len(sample_chunk) < hop_size:
+            # Zeropadding if too short
+            sample_chunk = np.hstack(
+                (sample_chunk, np.zeros(hop_size - len(sample_chunk))))
         pitch = pitcher(sample_chunk.astype(np.float32))[0]
         confidence = pitcher.get_confidence()
         pitches.append((pitch, confidence))
