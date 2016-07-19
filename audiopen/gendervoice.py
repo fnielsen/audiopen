@@ -256,6 +256,58 @@ def download_all(metadata, directory=DATA_DIRECTORY):
         download_one(remote_filename, directory=directory)
 
 
+class FeatureExtractor(object):
+    """Feature extractor.
+
+    Examples
+    --------
+    >>> feature_extractor = FeatureExtractor()
+    >>> from numpy.random import randn
+    >>> features = feature_extractor(randn(512))
+    >>> features.shape
+    (13,)
+
+    """
+
+    def __init__(self, sample_rate=11025, buf_size=1048, hop_size=256,
+                 n_mfcc_filters=40, n_mfcc_coeffs=13, pitch_method='yin'):
+        """Initialize feature extractor."""
+        self._sample_rate = int(sample_rate)
+        self._pvoc = aubio.pvoc(buf_size, hop_size)
+        self._mfcc = aubio.mfcc(buf_size, n_mfcc_filters, n_mfcc_coeffs,
+                                self._sample_rate)
+        self._pitch = aubio.pitch(
+            method=pitch_method, buf_size=buf_size, hop_size=hop_size,
+            samplerate=self._sample_rate)
+
+    def __call__(self, samples):
+        """Compute features.
+
+        Parameters
+        ----------
+        samples : numpy.ndarray
+            Array of samples
+
+        Returns
+        -------
+        features : numpy.ndarray
+            Array with features
+
+
+        References
+        ----------
+        https://github.com/aubio/aubio/blob/master/python/demos/demo_mfcc.py
+
+        """
+        samples_ = samples.astype(np.float32)
+        spec = self._pvoc(samples_)
+        mfccs = self._mfcc(spec)
+        pitch = self._pitch(samples_)
+        pitch_confidence = self._pitch.get_confidence()
+        features = np.hstack((mfccs, pitch, [pitch_confidence]))
+        return features
+
+
 def iter_filenames(metadata, directory=DATA_DIRECTORY, yield_gender=False):
     """Yield filenames for audio files.
 
@@ -548,6 +600,33 @@ def iter_samples_to_pitches(
             yield pitch
 
 
+def iter_samples_to_features(samples, sample_rate=11025, buf_size=1024,
+                             hop_size=256):
+    """Yield features from samples.
+
+    Parameters
+    ----------
+    samples : numpy.ndarray
+        Array with samples.
+
+    Yields
+    ------
+    features : numpy.ndarray
+        Array with features.
+
+    """
+    feature_extractor = FeatureExtractor(
+        sample_rate=sample_rate, buf_size=buf_size, hop_size=hop_size)
+
+    for sample_chunk in iter_chunk(samples, chunk_size=hop_size):
+        if len(sample_chunk) < hop_size:
+            # Zeropadding if too short
+            sample_chunk = np.hstack(
+                (sample_chunk, np.zeros(hop_size - len(sample_chunk))))
+        features = feature_extractor(sample_chunk)
+        yield features
+
+
 def get_pitches(audio, sample_rate=11025, method='yin', buf_size=2048,
                 hop_size=256):
     """Return estimated pitches for audio.
@@ -620,7 +699,7 @@ def get_pitch(audio, sample_rate=11025, method='yin', buf_size=2048,
 
 
 def detect_gender(audio, sample_rate=11025, method='yin', buf_size=2048,
-                  hop_size=256): 
+                  hop_size=256):
     """Detect gender of audio.
 
     The present detection method is based on pitch detection and a threshold.
@@ -653,7 +732,7 @@ def detect_gender(audio, sample_rate=11025, method='yin', buf_size=2048,
         return 'male'
 
 
-def iter_capture_and_detect_gender(sample_rate = 11025, hop_size=256,
+def iter_capture_and_detect_gender(sample_rate=11025, hop_size=256,
                                    confidence_threshold=0.8):
     """Capture audio and yield gender.
 
