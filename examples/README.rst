@@ -39,3 +39,37 @@ A session might look like this:
     female
     female
     female
+
+
+gender_pitches.py
+-----------------
+
+Pitch detection of audio data from Wikimedia Commons.
+
+.. code:: bash
+
+    $ python examples/gender_pitches.py 
+    ALSA lib pcm.c:2266:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+    ALSA lib pcm.c:2266:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+    ALSA lib pcm.c:2266:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+    ALSA lib pcm_route.c:867:(find_matching_chmap) Found no matching channel map
+    ALSA lib pcm_route.c:867:(find_matching_chmap) Found no matching channel map
+    ALSA lib pcm_route.c:867:(find_matching_chmap) Found no matching channel map
+    ALSA lib pcm_route.c:867:(find_matching_chmap) Found no matching channel map
+    Cannot connect to server socket err = No such file or directory
+    Cannot connect to server request channel
+    jack server is not running or cannot be started
+    JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for 4294967295, skipping unlock
+    JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for 4294967295, skipping unlock
+    /home/faan/data/audiopen/3037f71cbd844a2373c3a3252cac2abd03e5c0f10dd12a969c3604ef97f2826e.oga
+    male    - 136.12 Hz - Igor Czubajs
+    /home/faan/data/audiopen/d72015ce1512e1c524b3f42dbba60b0253a4ffb93f4bfa74ceee55ee770d69b7.oga
+    male    - 105.88 Hz - Alexander Shokhin
+    /home/faan/data/audiopen/deb9d71559e99586c9eb254e841e503e3664b244aecf6fbc38d6f70fe8f179ac.oga
+    male    - 144.01 Hz - Dmitry Shparo
+    /home/faan/data/audiopen/deb9d71559e99586c9eb254e841e503e3664b244aecf6fbc38d6f70fe8f179ac.oga
+    male    - 144.01 Hz - Dmitry Shparo
+    /home/faan/data/audiopen/ee4111947aef9d05dd915bb825b27c5488febc7caac844914a029fecf97d61ff.ogg
+    female  - 112.31 Hz - Alice Arnold
+    /home/faan/data/audiopen/03497cf1b087feb14ad61d8fb67c725d258e23bf1f1782d612e4193efa46a48e.flac
+    male    - 93.41 Hz - Andrew Hussey
