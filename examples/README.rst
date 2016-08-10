@@ -11,6 +11,8 @@ Only when the pitch detection algorithm is sufficient confident the script will 
 
 A session might look like this:
 
+.. code:: bash
+
     $ python capture_and_detect_gender.py 
     ALSA lib pcm_dsnoop.c:606:(snd_pcm_dsnoop_open) unable to open slave
     ALSA lib pcm_dmix.c:1029:(snd_pcm_dmix_open) unable to open slave
