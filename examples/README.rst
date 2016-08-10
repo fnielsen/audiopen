@@ -48,7 +48,7 @@ Pitch detection of audio data from Wikimedia Commons.
 
 .. code:: bash
 
-    $ python examples/gender_pitches.py 
+    $ python gender_pitches.py 
     ALSA lib pcm.c:2266:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
     ALSA lib pcm.c:2266:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
     ALSA lib pcm.c:2266:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
