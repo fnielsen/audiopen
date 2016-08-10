@@ -73,3 +73,18 @@ Pitch detection of audio data from Wikimedia Commons.
     female  - 112.31 Hz - Alice Arnold
     /home/faan/data/audiopen/03497cf1b087feb14ad61d8fb67c725d258e23bf1f1782d612e4193efa46a48e.flac
     male    - 93.41 Hz - Andrew Hussey
+
+
+features.py
+-----------
+
+.. code:: bash
+
+
+    $ python features.py
+    [-10.1418314   21.7928257  -16.97315979  19.26405144 -17.00856018
+      17.58937836 -15.83039188  15.42481899 -14.28900909  13.13132477
+     -12.09650803  10.68149757  -9.83863544  42.81553268   0.        ]
+    [ -2.46730995e+00   2.32820225e+01  -1.72524529e+01   1.98781567e+01
+      -1.73932934e+01   1.80337982e+01
+      ...
