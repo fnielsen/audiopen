@@ -269,7 +269,7 @@ class FeatureExtractor(object):
 
     """
 
-    def __init__(self, sample_rate=11025, buf_size=1048, hop_size=256,
+    def __init__(self, sample_rate=11025, buf_size=1024, hop_size=256,
                  n_mfcc_filters=40, n_mfcc_coeffs=13, pitch_method='yin'):
         """Initialize feature extractor."""
         self._sample_rate = int(sample_rate)
@@ -482,6 +482,36 @@ def get_audio_segment_mono_11025(audio, directory=DATA_DIRECTORY):
     return output
 
 
+def get_audio_segment_mono_22050(audio, directory=DATA_DIRECTORY):
+    """Convert audio segment to mono and 22050 Hertz sample rate.
+
+    Parameters
+    ----------
+    audio : str or pydub.AudioSegment
+        Audio segment and AudioSegment or filename
+    directory : str
+        Local directory where the audio files are to be stored.
+
+    Returns
+    -------
+    audio_segment : pydub.AudioSegment
+        Audio segment
+
+    """
+    if type(audio) == str:
+        filename = audio
+        audio_segment = get_audio_segment(filename, directory=directory)
+    elif type(audio) == AudioSegment:
+        audio_segment = audio
+    else:
+        raise ValueError('audio input has the wrong type')
+    if audio_segment.channels == 1 and audio_segment.frame_rate == 22050:
+        output = audio_segment
+    else:
+        output = audio_segment.split_to_mono()[0].set_frame_rate(22050)
+    return output
+
+
 def iter_samples_mono_11025(
         metadata, directory=DATA_DIRECTORY, yield_gender=False):
     """Yield samples in mono and 11025 Hz.
@@ -542,6 +572,32 @@ def get_samples_mono_11025(
 
     """
     audio_segment = get_audio_segment_mono_11025(audio)
+    output = np.array(audio_segment.get_array_of_samples())
+    return output
+
+
+def get_samples_mono_22050(
+        audio, directory=DATA_DIRECTORY, yield_gender=False):
+    """Return samples in mono and 22050 Hz.
+
+    The first channel is returned after a split to mono.
+
+    Parameters
+    ----------
+    audio : str or pydub.AudioSegment
+        Filename of audio object
+    directory : str
+        Local directory where the audio files are to be stored.
+    yield_gender : bool
+        Also yield gender if True.
+
+    Returnes
+    --------
+    samples : numpy.array
+        Resampled audio segments in mono as numpy array
+
+    """
+    audio_segment = get_audio_segment_mono_22050(audio)
     output = np.array(audio_segment.get_array_of_samples())
     return output
 
